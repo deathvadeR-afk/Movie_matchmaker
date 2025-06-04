@@ -1,0 +1,6 @@
+# Environment variables
+.env
+
+/new_venv/
+
+node_modules/
