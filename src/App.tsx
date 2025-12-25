@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, Film, Tv, PlayCircle } from 'lucide-react';
+import { Search, Sparkles, Film, Tv, PlayCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { MediaRecommendation, MediaType, MOOD_CHIPS, Review, StreamingProvider } from './types';
 import { getRecommendations, RecommendationOptions } from './utils/recommendationEngine';
 
@@ -10,6 +10,7 @@ function App() {
   const [mediaType, setMediaType] = useState<MediaType>('movie');
   const [hiddenGems, setHiddenGems] = useState(false);
   const [region] = useState('IN'); // Default to India
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +57,37 @@ function App() {
     }
   };
 
+  const toggleCard = (id: number) => {
+    const newExpanded = new Set(expandedCards);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedCards(newExpanded);
+  };
+
+  const getTMDBUrl = (item: MediaRecommendation) => {
+    const type = item.mediaType === 'anime' ? 'tv' : item.mediaType;
+    return `https://www.themoviedb.org/${type}/${item.id}`;
+  };
+
+  const getStreamingUrl = (providerName: string, title: string) => {
+    // Common streaming provider search URLs
+    const providers: Record<string, string> = {
+      'Netflix': `https://www.netflix.com/search?q=${encodeURIComponent(title)}`,
+      'Amazon Prime Video': `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${encodeURIComponent(title)}`,
+      'Disney Plus': `https://www.disneyplus.com/search?q=${encodeURIComponent(title)}`,
+      'Hotstar': `https://www.hotstar.com/in/search?q=${encodeURIComponent(title)}`,
+      'Zee5': `https://www.zee5.com/search?q=${encodeURIComponent(title)}`,
+      'SonyLIV': `https://www.sonyliv.com/search/${encodeURIComponent(title)}`,
+      'JioCinema': `https://www.jiocinema.com/search/${encodeURIComponent(title)}`,
+      'Crunchyroll': `https://www.crunchyroll.com/search?q=${encodeURIComponent(title)}`,
+    };
+
+    return providers[providerName] || `https://www.google.com/search?q=${encodeURIComponent(providerName + ' ' + title)}`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
       {/* Hero Section */}
@@ -80,8 +112,8 @@ function App() {
                 key={type}
                 onClick={() => setMediaType(type)}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all ${mediaType === type
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 hover:text-white'
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                  : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 hover:text-white'
                   }`}
               >
                 {getMediaTypeIcon(type)}
@@ -95,8 +127,8 @@ function App() {
             <button
               onClick={() => setHiddenGems(!hiddenGems)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${hiddenGems
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
-                  : 'bg-gray-800/30 text-gray-500 border border-gray-700/50 hover:border-gray-600'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
+                : 'bg-gray-800/30 text-gray-500 border border-gray-700/50 hover:border-gray-600'
                 }`}
             >
               <Sparkles className={`w-4 h-4 ${hiddenGems ? 'animate-pulse' : ''}`} />
@@ -185,11 +217,22 @@ function App() {
                   <div className="flex-1 p-6">
                     {/* Header */}
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                      <div>
-                        <h3 className="text-2xl font-bold text-white">
-                          {item.title}
-                          <span className="text-gray-500 font-normal ml-2">({item.year})</span>
-                        </h3>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-2xl font-bold text-white">
+                            {item.title}
+                            <span className="text-gray-500 font-normal ml-2">({item.year})</span>
+                          </h3>
+                          <a
+                            href={getTMDBUrl(item)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                            title="View on TMDB"
+                          >
+                            <ExternalLink className="w-5 h-5" />
+                          </a>
+                        </div>
                         <div className="flex items-center gap-3 mt-2">
                           <span className="flex items-center gap-1 text-yellow-400">
                             ★ {item.rating.toFixed(1)}
@@ -208,6 +251,22 @@ function App() {
                           )}
                         </div>
                       </div>
+                      <button
+                        onClick={() => toggleCard(item.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-700/50 hover:bg-gray-600/50 rounded-lg transition-colors text-sm"
+                      >
+                        {expandedCards.has(item.id) ? (
+                          <>
+                            <ChevronUp className="w-4 h-4" />
+                            <span>Less</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            <span>More</span>
+                          </>
+                        )}
+                      </button>
                     </div>
 
                     {/* AI Explanation */}
@@ -222,67 +281,75 @@ function App() {
                     {/* Plot */}
                     <p className="text-gray-400 mb-4 line-clamp-3">{item.plot}</p>
 
-                    {/* Trailer */}
-                    {item.trailerKey && (
-                      <div className="mb-4">
-                        <iframe
-                          width="100%"
-                          height="250"
-                          src={`https://www.youtube.com/embed/${item.trailerKey}`}
-                          title={`${item.title} trailer`}
-                          className="rounded-lg"
-                          allowFullScreen
-                        />
-                      </div>
-                    )}
-
                     {/* Streaming Providers */}
                     {item.streamingProviders && item.streamingProviders.length > 0 && (
                       <div className="mb-4">
                         <h4 className="text-sm font-semibold text-gray-400 mb-2">Where to Watch (India)</h4>
                         <div className="flex flex-wrap gap-2">
                           {item.streamingProviders.slice(0, 6).map((provider, index) => (
-                            <div
+                            <a
                               key={index}
-                              className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-full"
-                              title={provider.name}
+                              href={getStreamingUrl(provider.name, item.title)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 hover:bg-gray-600/70 rounded-full transition-colors cursor-pointer group"
+                              title={`Watch on ${provider.name}`}
                             >
                               <img
                                 src={provider.logo}
                                 alt={provider.name}
                                 className="w-5 h-5 rounded"
                               />
-                              <span className="text-xs text-gray-300">{provider.name}</span>
+                              <span className="text-xs text-gray-300 group-hover:text-white">{provider.name}</span>
                               <span className={`text-xs px-1.5 py-0.5 rounded ${provider.type === 'free' ? 'bg-green-500/20 text-green-400' :
                                   provider.type === 'flatrate' ? 'bg-blue-500/20 text-blue-400' :
                                     'bg-gray-600/50 text-gray-400'
                                 }`}>
                                 {getProviderTypeLabel(provider.type)}
                               </span>
-                            </div>
+                            </a>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Reviews */}
-                    {item.reviews && item.reviews.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-gray-700/50">
-                        <h4 className="text-sm font-semibold text-gray-400 mb-3">Reviews</h4>
-                        <div className="space-y-3">
-                          {item.reviews.slice(0, 2).map((review: Review, index: number) => (
-                            <div key={index} className="p-3 bg-gray-700/30 rounded-lg">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium text-sm text-white">{review.author}</span>
-                                {review.rating && (
-                                  <span className="text-yellow-400 text-xs">★ {review.rating}</span>
-                                )}
-                              </div>
-                              <p className="text-gray-400 text-sm line-clamp-2">{review.content}</p>
+                    {/* Expandable Content */}
+                    {expandedCards.has(item.id) && (
+                      <>
+                        {/* Trailer */}
+                        {item.trailerKey && (
+                          <div className="mb-4">
+                            <iframe
+                              width="100%"
+                              height="250"
+                              src={`https://www.youtube.com/embed/${item.trailerKey}`}
+                              title={`${item.title} trailer`}
+                              className="rounded-lg"
+                              allowFullScreen
+                            />
+                          </div>
+                        )}
+
+                        {/* Reviews */}
+                        {item.reviews && item.reviews.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-700/50">
+                            <h4 className="text-sm font-semibold text-gray-400 mb-3">Reviews</h4>
+                            <div className="space-y-3">
+                              {item.reviews.slice(0, 2).map((review: Review, index: number) => (
+                                <div key={index} className="p-3 bg-gray-700/30 rounded-lg">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium text-sm text-white">{review.author}</span>
+                                    {review.rating && (
+                                      <span className="text-yellow-400 text-xs">★ {review.rating}</span>
+                                    )}
+                                  </div>
+                                  <p className="text-gray-400 text-sm line-clamp-2">{review.content}</p>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
