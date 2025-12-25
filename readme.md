@@ -1,112 +1,90 @@
-# Vite React TypeScript Movie App
+# Movie Matchmaker 2.0
 
-This project is a modern web application for browsing and discovering movies, built with **React**, **TypeScript**, and **Vite**. It fetches movie data from [The Movie Database (TMDB)](https://www.themoviedb.org/) and displays information such as titles, ratings, and trailers. The app uses **Tailwind CSS** for styling and follows best practices with **ESLint** and **TypeScript** configurations.
+A premium, AI-powered movie, TV series, and anime discovery platform built with **React**, **TypeScript**, and **Vite**. Using **Google's Gemini 2.0 Flash**, it provides semantic recommendations that understand your "vibe," not just keywords.
 
-> **Important:**  
-> You must use a VPN set to the **USA** for the app to work. Without a USA-based VPN, the app will not function correctly due to TMDB API restrictions.
+![App Screenshot](file:///C:/Users/ASUS/.gemini/antigravity/brain/2b2b1868-6153-4bc5-bcd0-279e222ef16a/app_demo.webp)
+
+## 🚀 Key Features
+
+*   **🤖 AI-Powered Semantic Search**: Uses Gemini AI to understand complex requests like *"Show me a sad sci-fi movie about isolation."*
+*   **🧠 Hybrid Recommendation Engine**: Intelligent fallback system that uses AI first, and gracefully degrades to robust heuristic keywords if the AI is unavailable.
+*   **📺 Multi-Media Support**: Toggle between **Movies**, **TV Series**, and **Anime**.
+*   **😂 Mood Chips**: Quick-select buttons for instant recommendations based on your desired feeling.
+*   **💎 Hidden Gems Mode**: A toggle to prioritize underrated, critically acclaimed masterpieces over mainstream blockbusters.
+*   **🇮🇳 India-Specific Localization**: 
+    *   Showcases streaming availability on Indian providers (JioCinema, Hotstar, Zee5, etc.).
+    *   Localized language support (Hindi, Bengali, Telugu, etc.).
+*   **✨ Premium UI**: Modern glassmorphic design, vibrant gradients, and smooth micro-animations.
 
 ---
 
-## Features
+## 🛠️ Tech Stack
 
-- Browse and search for movies using TMDB data
-- View movie details, ratings, and trailers (YouTube embeds)
-- Responsive and modern UI with Tailwind CSS
-- Fast development experience with Vite
-- TypeScript for type safety
-- Linting with ESLint
+- **Frontend**: React 18, Vite, TypeScript
+- **Styling**: Tailwind CSS
+- **AI**: Google Generative AI (Gemini 2.0 Flash)
+- **Data Source**: The Movie Database (TMDB) API
+- **Icons**: Lucide React
 
 ---
 
-## Getting Started
+## 🚦 Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or newer recommended)
-- [npm](https://www.npmjs.com/) (comes with Node.js)
-- A VPN service (set to USA)
+- [Node.js](https://nodejs.org/) (v18+)
+- [npm](https://www.npmjs.com/)
+- **VPN**: A VPN set to **USA** is required for TMDB API requests to function globally.
 
 ### Installation
 
 1. **Clone the repository:**
-
    ```bash
    git clone https://github.com/deathvadeR-afk/Movie_matchmaker.git
    cd Movie_matchmaker
    ```
 
 2. **Install dependencies:**
-
    ```bash
    npm install
    ```
 
 3. **Set up environment variables:**
-
-   The project uses a `.env` file for the TMDB API key.  
-   By default, a sample `.env` is provided:
-
+   Create a `.env` file in the root directory:
+   ```env
+   VITE_TMDB_API_KEY=your_tmdb_api_key
+   VITE_GEMINI_API_KEY=your_gemini_api_key
    ```
-   VITE_TMDB_API_KEY=your_tmdb_api_key_here
-   ```
+   > You can get a free Gemini key at [Google AI Studio](https://aistudio.google.com/).
 
-   Replace `your_tmdb_api_key_here` with your own TMDB API key if needed.
-
-4. **Connect your VPN and set it to the USA.**
-
-   > The app will not work unless your VPN is set to a USA location.
-
-5. **Start the development server:**
-
+4. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-6. **Open your browser:**
-
-   Visit [http://localhost:3000](http://localhost:3000) (or the URL shown in your terminal).
-
 ---
 
-## Scripts
-
-- `npm run dev` — Start the development server
-- `npm run build` — Build the app for production
-- `npm run preview` — Preview the production build
-- `npm run lint` — Lint the codebase
-
----
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-├── src/                # React source code
-│   ├── components/     # React components
-│   ├── utils/          # Utility functions (TMDB API, movie matcher, etc.)
-│   └── main.tsx        # App entry point
-├── public/             # Static assets
-├── index.html          # Main HTML file
-├── tailwind.config.js  # Tailwind CSS configuration
-├── vite.config.ts      # Vite configuration
-├── .env                # Environment variables (TMDB API key)
-├── package.json        # Project metadata and scripts
-└── ...                 # Other config files
+├── src/
+│   ├── utils/
+│   │   ├── gemini.ts            # Google Generative AI integration
+│   │   ├── tmdb.ts              # TMDB API wrapper (TV/Movie/Search)
+│   │   └── recommendationEngine.ts # Hybrid AI + Heuristic logic
+│   ├── App.tsx                  # Main application & premium UI
+│   ├── types.ts                 # Unified media & recommendation types
+│   └── main.tsx                 # Entry point
+├── .env                         # API Keys (Ignored by git)
+└── tailwind.config.js           # Design system configuration
 ```
 
 ---
 
-## Notes
-
-- The app uses the TMDB API and may be subject to their usage limits and regional restrictions.
-- Make sure your VPN is active and set to the USA before using the app.
-- For any issues or feature requests, please open an issue on the repository.
-
----
-
-## License
+## 🛡️ License
 
 This project is licensed under the MIT License.
 
 ---
 
-**Enjoy discovering movies!**
+**Built with ❤️ for movie buffs who hate scrolling for hours.**

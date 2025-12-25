@@ -1,10 +1,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_TMDB_API_KEY: string
-  // Add more env variables here if needed
+  readonly VITE_TMDB_API_KEY: string;
+  readonly VITE_GEMINI_API_KEY: string;
 }
 
 interface ImportMeta {
-  readonly env: ImportMetaEnv
+  readonly env: ImportMetaEnv;
 }
