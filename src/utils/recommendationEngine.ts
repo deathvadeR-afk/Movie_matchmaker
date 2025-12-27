@@ -58,7 +58,7 @@ const languageKeywords: Record<string, string> = {
     indian: 'hi',
 };
 
-interface AnalyzedInput {
+export interface AnalyzedInput {
     genres: string[];
     emotions: string[];
     intensity: number;
@@ -75,7 +75,7 @@ function findKeywordMatches(text: string, dictionary: Record<string, string[]>):
         .map(([key]) => key);
 }
 
-function detectLanguage(text: string): string | undefined {
+export function detectLanguage(text: string): string | undefined {
     const lowerText = text.toLowerCase();
     for (const [keyword, langCode] of Object.entries(languageKeywords)) {
         if (lowerText.includes(keyword)) {
@@ -85,13 +85,13 @@ function detectLanguage(text: string): string | undefined {
     return undefined;
 }
 
-function detectRecency(text: string): boolean {
+export function detectRecency(text: string): boolean {
     const recencyWords = ['new', 'latest', 'recent', '2024', '2025', 'current', 'this year', 'now playing'];
     const lowerText = text.toLowerCase();
     return recencyWords.some((word) => lowerText.includes(word));
 }
 
-function analyzeUserInput(input: string): AnalyzedInput {
+export function analyzeUserInput(input: string): AnalyzedInput {
     const analysis: AnalyzedInput = {
         genres: findKeywordMatches(input, genreKeywords),
         emotions: findKeywordMatches(input, emotionKeywords),
