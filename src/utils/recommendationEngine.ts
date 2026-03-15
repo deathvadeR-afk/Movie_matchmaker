@@ -1,4 +1,4 @@
-import { MediaRecommendation, MediaType, Review } from '../types';
+import { MediaRecommendation, MediaType, Review, PaginationInfo } from '../types';
 import { getAIRecommendations, AIRecommendation } from './gemini';
 import {
     searchMedia,
@@ -12,6 +12,14 @@ import {
     TMDBMedia,
     SearchOptions,
 } from './tmdb';
+import {
+    analyzeUserInputWithNLP,
+    getSearchParams,
+    parseNaturalLanguage,
+    EnhancedAnalyzedInput,
+    NLPAnalysisResult,
+    isNLPAvailable,
+} from './nlpProcessor';
 
 // Keyword dictionaries for heuristic fallback
 const genreKeywords: Record<string, string[]> = {
@@ -92,6 +100,21 @@ export function detectRecency(text: string): boolean {
 }
 
 export function analyzeUserInput(input: string): AnalyzedInput {
+    // Try NLP-based analysis first
+    if (isNLPAvailable()) {
+        const nlpAnalysis = analyzeUserInputWithNLP(input);
+
+        // Map NLP analysis to AnalyzedInput format
+        return {
+            genres: nlpAnalysis.genres,
+            emotions: nlpAnalysis.emotions,
+            intensity: nlpAnalysis.intensity,
+            language: nlpAnalysis.language,
+            wantsRecent: nlpAnalysis.wantsRecent,
+        };
+    }
+
+    // Fallback to basic keyword matching
     const analysis: AnalyzedInput = {
         genres: findKeywordMatches(input, genreKeywords),
         emotions: findKeywordMatches(input, emotionKeywords),
@@ -119,6 +142,8 @@ export interface RecommendationOptions {
     mediaType: MediaType;
     hiddenGems: boolean;
     region: string;
+    page?: number; // Page number for pagination (default: 1)
+    recentOnly?: boolean; // Filter for recent releases (past year)
 }
 
 /**
@@ -127,18 +152,29 @@ export interface RecommendationOptions {
 export async function getRecommendations(
     userInput: string,
     options: RecommendationOptions = { mediaType: 'movie', hiddenGems: false, region: 'IN' }
-): Promise<MediaRecommendation[]> {
-    const { mediaType, hiddenGems, region } = options;
+): Promise<{ recommendations: MediaRecommendation[]; pagination: PaginationInfo }> {
+    const { mediaType, hiddenGems, region, page = 1, recentOnly = false } = options;
+
+    // Get the current year for recent filtering
+    const currentYear = new Date().getFullYear();
+    const recentYear = recentOnly ? currentYear : undefined;
+
+    // Get enhanced NLP analysis
+    let nlpAnalysis: EnhancedAnalyzedInput | undefined;
+    if (isNLPAvailable()) {
+        nlpAnalysis = analyzeUserInputWithNLP(userInput);
+    }
+
     const analysis = analyzeUserInput(userInput);
 
     // Get fresh context if user wants recent content
     let freshContext: string[] | undefined;
-    if (analysis.wantsRecent) {
+    if (analysis.wantsRecent || recentOnly) {
         freshContext = await getRecentReleases(mediaType, 15);
     }
 
     // Try AI recommendations first
-    const aiResult = await getAIRecommendations(userInput, mediaType, hiddenGems, freshContext);
+    const aiResult = await getAIRecommendations(userInput, mediaType, hiddenGems, freshContext, recentOnly);
 
     let recommendations: MediaRecommendation[] = [];
 
@@ -157,7 +193,8 @@ export async function getRecommendations(
         const heuristicResults = await getHeuristicRecommendations(
             userInput,
             analysis,
-            options
+            options,
+            nlpAnalysis
         );
 
         // Merge without duplicates
@@ -169,10 +206,13 @@ export async function getRecommendations(
         }
     }
 
-    return recommendations
-        .filter((r) => r.matchPercentage > 30)
-        .sort((a, b) => b.matchPercentage - a.matchPercentage)
-        .slice(0, 7);
+    return {
+        recommendations: recommendations
+            .filter((r) => r.matchPercentage > 30)
+            .sort((a, b) => b.matchPercentage - a.matchPercentage)
+            .slice(0, 7),
+        pagination: { totalPages: 1, currentPage: page, totalResults: recommendations.length }
+    };
 }
 
 /**
@@ -200,23 +240,40 @@ async function processAIRecommendations(
 
 /**
  * Heuristic-based recommendations (keyword matching + TMDB discover)
+ * Enhanced with NLP for better entity extraction
  */
 async function getHeuristicRecommendations(
     query: string,
     analysis: AnalyzedInput,
-    options: RecommendationOptions
+    options: RecommendationOptions,
+    nlpAnalysis?: EnhancedAnalyzedInput
 ): Promise<MediaRecommendation[]> {
-    const { mediaType, hiddenGems, region } = options;
+    const { mediaType, hiddenGems, region, page = 1, recentOnly = false } = options;
+
+    // Get current year for recent filtering
+    const currentYear = new Date().getFullYear();
+    const recentYear = recentOnly ? currentYear : undefined;
+
+    // Use NLP-enhanced parameters if available
+    const genres = nlpAnalysis?.genres || analysis.genres;
+    const language = nlpAnalysis?.language || analysis.language;
+    const temporal = nlpAnalysis?.temporal;
 
     const searchOptions: SearchOptions = {
         mediaType,
-        genres: analysis.genres,
-        language: analysis.language,
+        genres,
+        language,
         region,
         hiddenGems,
+        page,
+        // Add year filter for recent releases
+        ...(recentYear && { year: recentYear }),
+        // Add year/decade filters from NLP temporal extraction (prefer NLP if available)
+        ...(temporal?.startYear && temporal?.type === 'year' && { year: temporal.startYear }),
+        ...(temporal?.value && temporal?.type === 'decade' && { decade: temporal.value }),
     };
 
-    const mediaItems = await searchMedia(query, searchOptions);
+    const { results: mediaItems, pagination } = await searchMedia(query, searchOptions);
 
     const results: MediaRecommendation[] = [];
     for (const media of mediaItems.slice(0, 10)) {
@@ -287,5 +344,10 @@ async function buildRecommendation(
 
 // Legacy export for backward compatibility
 export const getMovieRecommendations = async (input: string) => {
-    return getRecommendations(input, { mediaType: 'movie', hiddenGems: false, region: 'IN' });
+    const result = await getRecommendations(input, { mediaType: 'movie', hiddenGems: false, region: 'IN' });
+    return result.recommendations;
 };
+
+// Re-export NLP functions for convenience
+export { analyzeUserInputWithNLP, getSearchParams, parseNaturalLanguage };
+export type { EnhancedAnalyzedInput, NLPAnalysisResult } from './nlpProcessor';

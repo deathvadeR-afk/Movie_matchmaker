@@ -2,7 +2,31 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
+// Configurable Gemini model - defaults to flash for cost/speed efficiency
+// Set VITE_GEMINI_MODEL in environment to use a different model (e.g., 'gemini-2.0-pro')
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash';
+
 let genAI: GoogleGenerativeAI | null = null;
+
+/**
+ * Validates the Gemini API key
+ * @returns true if the API key is present and valid (non-empty string)
+ * @throws Error if the API key is missing or invalid
+ */
+export function validateGeminiApiKey(): boolean {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.trim() === '') {
+    throw new Error('Gemini API key is missing or invalid. Please set VITE_GEMINI_API_KEY in your environment variables.');
+  }
+  return true;
+}
+
+/**
+ * Checks if the Gemini API key is configured (without throwing an error)
+ * @returns true if the API key is present and valid
+ */
+export function isGeminiApiKeyConfigured(): boolean {
+  return !!(GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '');
+}
 
 function getGenAI(): GoogleGenerativeAI {
   if (!genAI) {
@@ -32,16 +56,29 @@ export interface GeminiRecommendationResult {
  * @param mediaType - 'movie' | 'tv' | 'anime'
  * @param hiddenGems - If true, prioritize lesser-known titles
  * @param freshContext - Optional list of recent titles from TMDB to inject for recency
+ * @param recentOnly - If true, only recommend content from the past year
  */
 export async function getAIRecommendations(
   userPrompt: string,
   mediaType: 'movie' | 'tv' | 'anime' = 'movie',
   hiddenGems: boolean = false,
-  freshContext?: string[]
+  freshContext?: string[],
+  recentOnly: boolean = false
 ): Promise<GeminiRecommendationResult> {
+  // Check if API key is configured - return graceful fallback if not
+  if (!isGeminiApiKeyConfigured()) {
+    console.warn('Gemini API key not configured. Using fallback recommendations.');
+    return {
+      recommendations: [],
+      success: false,
+      error: 'AI recommendations unavailable - API key not configured. Using fallback.',
+    };
+  }
+
   try {
+    validateGeminiApiKey();
     const ai = getGenAI();
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = ai.getGenerativeModel({ model: GEMINI_MODEL });
 
     const mediaTypeDescriptions = {
       movie: 'movies',
@@ -61,11 +98,18 @@ ${freshContext.map((title, i) => `${i + 1}. ${title}`).join('\n')}
       ? 'Prioritize lesser-known, underrated, or hidden gem titles over mainstream popular ones. Focus on critically acclaimed but not widely seen content.'
       : 'You may include popular mainstream titles if they fit well.';
 
+    const currentYear = new Date().getFullYear();
+    const recentInstruction = recentOnly
+      ? `STRICT REQUIREMENT: Only recommend ${mediaTypeDescriptions[mediaType]} released in ${currentYear} or ${currentYear - 1} (the past year). Do NOT recommend anything older than ${currentYear - 1}.`
+      : '';
+
     const systemPrompt = `You are an expert ${mediaTypeDescriptions[mediaType]} recommender with encyclopedic knowledge.
 
 The user will describe what they're looking for. Your job is to recommend exactly 5 ${mediaTypeDescriptions[mediaType]} that match their request.
 
 ${hiddenGemsInstruction}
+
+${recentInstruction}
 
 ${contextSection}
 
@@ -85,7 +129,7 @@ Example response format:
     ]);
 
     const responseText = result.response.text().trim();
-    
+
     // Clean up potential markdown code blocks
     let jsonText = responseText;
     if (jsonText.startsWith('```')) {
@@ -118,9 +162,16 @@ Example response format:
 export async function analyzePromptWithAI(
   userPrompt: string
 ): Promise<{ genres: string[]; emotions: string[]; intensity: number } | null> {
+  // Check if API key is configured - return graceful fallback if not
+  if (!isGeminiApiKeyConfigured()) {
+    console.warn('Gemini API key not configured. AI analysis unavailable.');
+    return null;
+  }
+
   try {
+    validateGeminiApiKey();
     const ai = getGenAI();
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = ai.getGenerativeModel({ model: GEMINI_MODEL });
 
     const systemPrompt = `Analyze the following movie/TV request and extract:
 1. genres: array of relevant genre keywords (action, thriller, drama, comedy, romance, horror, sci-fi, fantasy, animation, documentary)
