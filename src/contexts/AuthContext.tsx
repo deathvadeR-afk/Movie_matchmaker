@@ -38,7 +38,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Initialize auth state
     useEffect(() => {
-        initAuth();
+        // Timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+            console.warn('Auth initialization timed out');
+            setIsLoading(false);
+        }, 5000);
+
+        initAuth().finally(() => {
+            clearTimeout(timeoutId);
+        });
     }, []);
 
     async function initAuth() {

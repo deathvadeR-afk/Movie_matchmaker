@@ -2,9 +2,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Configurable Gemini model - defaults to flash for cost/speed efficiency
-// Set VITE_GEMINI_MODEL in environment to use a different model (e.g., 'gemini-2.0-pro')
-const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash';
+// Configurable model - defaults to Gemma for better results
+// Set VITE_GEMINI_MODEL in environment to use a different model
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemma-3-27b-it'
 
 let genAI: GoogleGenerativeAI | null = null;
 

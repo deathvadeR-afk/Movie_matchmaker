@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import App from './App';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import { useAuth } from './contexts/AuthContext';
 
 /**
@@ -75,6 +76,7 @@ function AppRouterContent() {
                     </PublicRoute>
                 }
             />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
             {/* Protected Routes - require authentication */}
             <Route

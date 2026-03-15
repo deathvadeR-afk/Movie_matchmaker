@@ -225,7 +225,8 @@ export async function testApiKey(provider: string, apiKey: string): Promise<{ su
             // Import dynamically to avoid issues
             const { GoogleGenerativeAI } = await import('@google/generative-ai');
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+            const modelName = import.meta.env.VITE_GEMINI_MODEL || 'gemma-3-27b-it';
+            const model = genAI.getGenerativeModel({ model: modelName });
 
             // Make a simple request
             const result = await model.generateContent('Say "test successful"');

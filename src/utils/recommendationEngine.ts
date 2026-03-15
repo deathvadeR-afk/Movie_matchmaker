@@ -142,6 +142,7 @@ export interface RecommendationOptions {
     mediaType: MediaType;
     hiddenGems: boolean;
     region: string;
+    language?: string; // Language code (e.g., 'hi' for Hindi)
     page?: number; // Page number for pagination (default: 1)
     recentOnly?: boolean; // Filter for recent releases (past year)
 }
@@ -270,10 +271,10 @@ async function getHeuristicRecommendations(
         ...(recentYear && { year: recentYear }),
         // Add year/decade filters from NLP temporal extraction (prefer NLP if available)
         ...(temporal?.startYear && temporal?.type === 'year' && { year: temporal.startYear }),
-        ...(temporal?.value && temporal?.type === 'decade' && { decade: temporal.value }),
+        ...(temporal?.value && temporal?.type === 'decade' && { decade: parseInt(temporal.value) }),
     };
 
-    const { results: mediaItems, pagination } = await searchMedia(query, searchOptions);
+    const mediaItems = await searchMedia(query, searchOptions);
 
     const results: MediaRecommendation[] = [];
     for (const media of mediaItems.slice(0, 10)) {

@@ -4,6 +4,11 @@ import { MediaType, StreamingProvider, Review } from '../types';
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
 
+// Validate TMDB API key on module load
+if (!TMDB_API_KEY || TMDB_API_KEY.trim() === '') {
+  console.warn('TMDB API key is not configured. TMDB features will not work.');
+}
+
 // Animation genre ID for detecting anime
 const ANIMATION_GENRE_ID = 16;
 
@@ -103,6 +108,8 @@ export interface SearchOptions {
   region?: string;       // e.g., 'IN' for India
   hiddenGems?: boolean;  // Prioritize high rating, low popularity
   year?: number;
+  page?: number;        // Page number for pagination
+  decade?: number;      // Filter by decade (e.g., 2020 for 2020s)
 }
 
 /**

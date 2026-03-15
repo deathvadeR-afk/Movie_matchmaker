@@ -1,10 +1,10 @@
 /**
  * Subscription Preference Modal
- * Allows users to opt-in to paid subscription or bring their own API key
+ * Users can upgrade to premium or use the free default API key
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, CreditCard, Key, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { X, CreditCard, Key, Check, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { saveSubscriptionPreference, getSubscriptionPlans } from '../lib/subscription';
 
 interface SubscriptionModalProps {
@@ -89,39 +89,33 @@ export function SubscriptionModal({ isOpen, onClose, onComplete }: SubscriptionM
 
                 {/* Content */}
                 <div className="p-6 space-y-4">
-                    {/* Option 1: Bring Your Own API Key */}
-                    <button
-                        onClick={() => setSelectedOption('api')}
-                        className={`w-full p-4 rounded-xl border-2 transition-all text-left ${selectedOption === 'api'
-                            ? 'border-gold-500 bg-gold-500/10'
-                            : 'border-cinema-600 hover:border-cinema-500'
-                            }`}
-                    >
+                    {/* Free Plan - Default API Key */}
+                    <div className="w-full p-4 rounded-xl border-2 border-gold-500/50 bg-gold-500/5">
                         <div className="flex items-start gap-4">
-                            <div className={`p-3 rounded-lg ${selectedOption === 'api' ? 'bg-gold-600' : 'bg-cinema-600'}`}>
-                                <Key className="w-6 h-6 text-cinema-950" />
+                            <div className="p-3 rounded-lg bg-gold-600">
+                                <Sparkles className="w-6 h-6 text-cinema-950" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="font-semibold text-cream-100 text-lg">Bring Your Own API Key</h3>
+                                <h3 className="font-semibold text-cream-100 text-lg">Free Plan</h3>
                                 <p className="text-cream-400 text-sm mt-1">
-                                    Use your own Gemini API key. You'll need to create one at makersuite.google.com/app/apikey
+                                    Using default API key with Gemma 3 model. Enjoy AI-powered recommendations!
                                 </p>
                                 <div className="mt-3 flex items-center gap-2 text-green-400 text-sm">
                                     <Check className="w-4 h-4" />
-                                    <span>Free to use</span>
+                                    <span>No API key needed</span>
                                 </div>
                             </div>
                         </div>
-                    </button>
+                    </div>
 
                     {/* Divider */}
                     <div className="flex items-center gap-4 my-6">
                         <div className="flex-1 h-px bg-cinema-700" />
-                        <span className="text-cream-500 text-sm">OR</span>
+                        <span className="text-cream-500 text-sm">UPGRADE</span>
                         <div className="flex-1 h-px bg-cinema-700" />
                     </div>
 
-                    {/* Option 2: Premium Subscription */}
+                    {/* Premium Subscription */}
                     <button
                         onClick={() => setSelectedOption('premium')}
                         className={`w-full p-4 rounded-xl border-2 transition-all text-left ${selectedOption === 'premium'

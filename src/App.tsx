@@ -1,11 +1,102 @@
-import React, { useState } from 'react';
-import { Search, Sparkles, Film, Tv, PlayCircle, ChevronDown, ChevronUp, ExternalLink, Mic, Loader2, LogOut, User, Settings } from 'lucide-react';
-import { MediaRecommendation, MediaType, MOOD_CHIPS, Review, StreamingProvider } from './types';
+import React, { useState, useEffect } from 'react';
+import { Search, Sparkles, Film, Tv, PlayCircle, ChevronDown, ChevronUp, ExternalLink, Mic, Loader2, LogOut, User, Settings, MicOff, Globe, Languages, Calendar } from 'lucide-react';
+import { MediaRecommendation, MediaType, MOOD_CHIPS, Review, StreamingProvider, VoiceState } from './types';
 import { getRecommendations, RecommendationOptions } from './utils/recommendationEngine';
+import { startListening, stopListening, isVoiceSupported, setOnResult, setOnStateChange } from './utils/voiceSearch';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Badge } from './components/ui/Badge';
 import { useAuth } from './contexts/AuthContext';
+
+// Region and Language options for TMDB
+const REGIONS = [
+  { code: 'IN', name: 'India' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+];
+
+const LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'bn', name: 'Bengali' },
+  { code: 'ta', name: 'Tamil' },
+  { code: 'te', name: 'Telugu' },
+  { code: 'ml', name: 'Malayalam' },
+  { code: 'kn', name: 'Kannada' },
+  { code: 'mr', name: 'Marathi' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+];
+
+// Keyword mappings for auto-detection from search text
+const LANGUAGE_KEYWORDS: Record<string, string> = {
+  'hindi': 'hi', 'bollywood': 'hi', 'bolly': 'hi',
+  'bengali': 'bn', 'bangla': 'bn',
+  'tamil': 'ta',
+  'telugu': 'te',
+  'malayalam': 'ml',
+  'kannada': 'kn',
+  'marathi': 'mr',
+  'japanese': 'ja', 'anime': 'ja', 'japan': 'ja',
+  'korean': 'ko', 'kdrama': 'ko', 'korea': 'ko',
+  'chinese': 'zh', 'china': 'zh',
+  'spanish': 'es', 'español': 'es',
+  'french': 'fr', 'français': 'fr',
+  'german': 'de', 'deutsch': 'de',
+  'english': 'en',
+};
+
+const REGION_KEYWORDS: Record<string, string> = {
+  'india': 'IN', 'indian': 'IN', 'bollywood': 'IN',
+  'united states': 'US', 'usa': 'US', 'america': 'US', 'american': 'US',
+  'uk': 'GB', 'united kingdom': 'GB', 'british': 'GB', 'england': 'GB',
+  'japan': 'JP', 'japanese': 'JP', 'tokyo': 'JP',
+  'korea': 'KR', 'korean': 'KR', 'seoul': 'KR',
+  'canada': 'CA', 'canadian': 'CA',
+  'australia': 'AU', 'australian': 'AU',
+  'germany': 'DE', 'german': 'DE', 'berlin': 'DE',
+  'france': 'FR', 'french': 'FR', 'paris': 'FR',
+  'spain': 'ES', 'spanish': 'ES', 'madrid': 'ES',
+  'italy': 'IT', 'italian': 'IT', 'rome': 'IT',
+  'brazil': 'BR', 'brazilian': 'BR',
+  'mexico': 'MX', 'mexican': 'MX',
+};
+
+// Detect language code from search text
+function detectLanguage(text: string): string | null {
+  const lowerText = text.toLowerCase();
+  for (const [keyword, code] of Object.entries(LANGUAGE_KEYWORDS)) {
+    if (lowerText.includes(keyword)) {
+      return code;
+    }
+  }
+  return null;
+}
+
+// Detect region code from search text
+function detectRegion(text: string): string | null {
+  const lowerText = text.toLowerCase();
+  for (const [keyword, code] of Object.entries(REGION_KEYWORDS)) {
+    if (lowerText.includes(keyword)) {
+      return code;
+    }
+  }
+  return null;
+}
 
 function App() {
   const [input, setInput] = useState('');
@@ -13,11 +104,38 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [mediaType, setMediaType] = useState<MediaType>('movie');
   const [hiddenGems, setHiddenGems] = useState(false);
-  const [region] = useState('IN'); // Default to India
+  const [latestReleases, setLatestReleases] = useState(false);
+  const [region, setRegion] = useState('IN'); // Default to India
+  const [language, setLanguage] = useState(''); // Empty means all languages
+  const [showRegionDropdown, setShowRegionDropdown] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [refineInput, setRefineInput] = useState('');
 
   const { user, signOut, profile } = useAuth();
+
+  // Check voice support on mount
+  useEffect(() => {
+    setVoiceSupported(isVoiceSupported());
+
+    // Set up voice result callback
+    setOnResult((result) => {
+      if (result.transcript) {
+        setInput(result.transcript);
+        setIsListening(false);
+        // Auto-submit after voice input
+        fetchRecommendations(result.transcript);
+      }
+    });
+
+    // Set up voice state callback
+    setOnStateChange((state) => {
+      setIsListening(state === 'listening');
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,23 +143,86 @@ function App() {
       alert('Please provide a more detailed description (at least 3 words)');
       return;
     }
+
+    // Auto-detect language and region from search text
+    const detectedLanguage = detectLanguage(input);
+    const detectedRegion = detectRegion(input);
+
+    // Update selectors if detected (only if user hasn't manually set them)
+    if (detectedLanguage && !language) {
+      setLanguage(detectedLanguage);
+    }
+    if (detectedRegion && !region) {
+      setRegion(detectedRegion);
+    }
+
     await fetchRecommendations(input);
   };
 
   const handleMoodClick = async (prompt: string) => {
     setInput(prompt);
+    // Auto-detect language and region from prompt
+    const detectedLanguage = detectLanguage(prompt);
+    const detectedRegion = detectRegion(prompt);
+    if (detectedLanguage && !language) setLanguage(detectedLanguage);
+    if (detectedRegion && !region) setRegion(detectedRegion);
     await fetchRecommendations(prompt);
   };
 
-  const fetchRecommendations = async (query: string) => {
+  // Handle refine recommendations
+  const handleRefine = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!refineInput.trim()) return;
+
+    // Combine original query with refinement
+    const refinedQuery = `${input} but ${refineInput}`;
+    await fetchRecommendations(refinedQuery);
+    setRefineInput('');
+  };
+
+  const toggleVoiceSearch = () => {
+    if (isListening) {
+      stopListening();
+      setIsListening(false);
+    } else {
+      if (voiceSupported) {
+        startListening();
+        setIsListening(true);
+      } else {
+        alert('Voice recognition is not supported in your browser.');
+      }
+    }
+  };
+
+  const fetchRecommendations = async (query: string, detectedLanguage?: string, detectedRegion?: string) => {
     setIsLoading(true);
+
+    // Timeout after 30 seconds to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      alert('Request timed out. Please try again.');
+    }, 30000);
+
     try {
-      const options: RecommendationOptions = { mediaType, hiddenGems, region };
+      // Use detected values if provided, otherwise fall back to state values
+      const langToUse = detectedLanguage || language;
+      const regionToUse = detectedRegion || region;
+      const options: RecommendationOptions = { mediaType, hiddenGems, region: regionToUse, language: langToUse || undefined, recentOnly: latestReleases };
       const results = await getRecommendations(query, options);
+
+      clearTimeout(timeoutId);
+
+      if (results.recommendations.length === 0) {
+        alert('No recommendations found. This might be due to API limitations. Please try a different search term.');
+        setIsLoading(false);
+        return;
+      }
       setRecommendations(results.recommendations);
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('Error fetching recommendations:', error);
-      alert('Failed to fetch recommendations. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to fetch recommendations: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +284,7 @@ function App() {
 
       {/* Header */}
       <header className="relative z-20 py-4 border-b border-cinema-800/50">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <h1 className="text-2xl font-display font-bold text-cream-100">CineMatch</h1>
           <div className="relative">
             <button
@@ -112,7 +293,7 @@ function App() {
             >
               <User className="w-5 h-5 text-gold-500" />
               <span className="text-sm text-cream-200">
-                {profile?.full_name || user?.email?.split('@')[0] || 'User'}
+                {profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
               </span>
             </button>
             {showUserMenu && (
@@ -137,8 +318,8 @@ function App() {
       </header>
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="max-w-5xl mx-auto px-6 py-16 relative">
+      <div className="relative overflow-visible">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-16 relative">
           {/* Title */}
           <div className="text-center mb-12">
             <h1 className="text-5xl md:text-6xl font-display font-bold mb-4 text-cream-100 animate-fade-in">
@@ -166,8 +347,8 @@ function App() {
             ))}
           </div>
 
-          {/* Hidden Gems Toggle */}
-          <div className="flex justify-center mb-8 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          {/* Hidden Gems and Latest Releases Toggles */}
+          <div className="flex justify-center gap-4 mb-8 animate-slide-up" style={{ animationDelay: '0.3s' }}>
             <button
               onClick={() => setHiddenGems(!hiddenGems)}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${hiddenGems
@@ -176,7 +357,17 @@ function App() {
                 }`}
             >
               <Sparkles className={`w-4 h-4 ${hiddenGems ? 'animate-pulse text-gold-500' : ''}`} />
-              Hidden Gems Mode
+              Hidden Gems
+            </button>
+            <button
+              onClick={() => setLatestReleases(!latestReleases)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${latestReleases
+                ? 'bg-gold-600/20 text-gold-500 border border-gold-600/50 shadow-glow'
+                : 'bg-cinema-800/50 text-cream-400 border border-cinema-700/50 hover:border-gold-600/30 hover:text-gold-500'
+                }`}
+            >
+              <Calendar className={`w-4 h-4 ${latestReleases ? 'animate-pulse text-gold-500' : ''}`} />
+              Latest Releases
             </button>
           </div>
 
@@ -197,7 +388,7 @@ function App() {
           </div>
 
           {/* Search Form */}
-          <form onSubmit={handleSubmit} className="max-w-3xl mx-auto animate-slide-up" style={{ animationDelay: '0.6s' }}>
+          <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto px-4 sm:px-0 animate-slide-up" style={{ animationDelay: '0.6s' }}>
             <div className="relative group">
               {/* Glow effect on focus */}
               <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-600/50 to-gold-400/50 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
@@ -214,10 +405,13 @@ function App() {
                   />
                   <button
                     type="button"
-                    className="mr-2 p-2 text-cream-400 hover:text-gold-500 transition-colors"
-                    title="Voice Search"
+                    onClick={toggleVoiceSearch}
+                    disabled={!voiceSupported}
+                    className={`mr-2 p-2 transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-cream-400 hover:text-gold-500'
+                      }`}
+                    title={voiceSupported ? (isListening ? 'Stop Voice Search' : 'Voice Search') : 'Voice Search Not Supported'}
                   >
-                    <Mic className="w-5 h-5" />
+                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                   </button>
                 </div>
                 <Button
@@ -233,11 +427,72 @@ function App() {
               </div>
             </div>
           </form>
+
+          {/* Region and Language Selectors - Below Search */}
+          <div className="flex justify-center gap-4 mt-6 animate-slide-up" style={{ animationDelay: '0.7s' }}>
+            {/* Region Selector */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowRegionDropdown(!showRegionDropdown); setShowLanguageDropdown(false); }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cinema-800/50 text-cream-300 border border-cinema-700/50 hover:border-gold-600/30 hover:text-gold-500 transition-all duration-300"
+              >
+                <Globe className="w-4 h-4" />
+                <span>{REGIONS.find(r => r.code === region)?.name || 'Region'}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showRegionDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {showRegionDropdown && (
+                <div className="absolute top-full mt-2 left-0 w-64 bg-cinema-800 border border-cinema-700 rounded-lg shadow-elevated z-[100] max-h-96 overflow-y-auto">
+                  {REGIONS.map((r) => (
+                    <button
+                      key={r.code}
+                      onClick={() => { setRegion(r.code); setShowRegionDropdown(false); }}
+                      className={`w-full block text-left px-4 py-3 hover:bg-cinema-700 transition-colors ${region === r.code ? 'text-gold-500 bg-cinema-700' : 'text-cream-300'
+                        }`}
+                    >
+                      {r.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Language Selector */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowLanguageDropdown(!showLanguageDropdown); setShowRegionDropdown(false); }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cinema-800/50 text-cream-300 border border-cinema-700/50 hover:border-gold-600/30 hover:text-gold-500 transition-all duration-300"
+              >
+                <Languages className="w-4 h-4" />
+                <span>{LANGUAGES.find(l => l.code === language)?.name || 'All Languages'}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {showLanguageDropdown && (
+                <div className="absolute top-full mt-2 left-0 w-64 bg-cinema-800 border border-cinema-700 rounded-lg shadow-elevated z-[100] max-h-96 overflow-y-auto">
+                  <button
+                    onClick={() => { setLanguage(''); setShowLanguageDropdown(false); }}
+                    className={`w-full block text-left px-4 py-3 hover:bg-cinema-700 transition-colors ${language === '' ? 'text-gold-500 bg-cinema-700' : 'text-cream-300'}`}
+                  >
+                    All Languages
+                  </button>
+                  {LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => { setLanguage(l.code); setShowLanguageDropdown(false); }}
+                      className={`w-full block text-left px-4 py-3 hover:bg-cinema-700 transition-colors ${language === l.code ? 'text-gold-500 bg-cinema-700' : 'text-cream-300'
+                        }`}
+                    >
+                      {l.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Results Section */}
-      <div className="max-w-5xl mx-auto px-6 pb-16">
+      <div className="w-full px-4 sm:px-6 lg:px-8 pb-8 sm:pb-16">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
             <div className="relative">
@@ -251,6 +506,25 @@ function App() {
             <h2 className="text-3xl font-display font-semibold text-center text-cream-100 animate-slide-up">
               Found {recommendations.length} {mediaType === 'tv' ? 'shows' : `${mediaType}s`} for you
             </h2>
+
+            {/* Refine Recommendations */}
+            <form onSubmit={handleRefine} className="max-w-2xl mx-auto animate-slide-up">
+              <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-600/30 to-gold-400/30 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
+                <div className="relative flex gap-2 p-2 bg-cinema-800/80 rounded-xl border border-cinema-700/50 group-focus-within:border-gold-600/50">
+                  <input
+                    type="text"
+                    value={refineInput}
+                    onChange={(e) => setRefineInput(e.target.value)}
+                    placeholder="Refine recommendations: e.g., make it darker, more romantic..."
+                    className="flex-1 px-4 py-3 bg-transparent focus:outline-none text-cream-100 placeholder-cream-500"
+                  />
+                  <Button type="submit" variant="primary" size="md">
+                    Refine
+                  </Button>
+                </div>
+              </div>
+            </form>
 
             {recommendations.map((item, index) => (
               <div
