@@ -17,7 +17,14 @@ import {
 } from '../types';
 import { getCached, setCache, generateCacheKey } from './cacheManager';
 
-const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+// Check for runtime API key - prioritize localStorage
+function getTmdbApiKey(): string {
+    const localKey = localStorage.getItem('tmdb_api_key');
+    if (localKey) return localKey;
+    return import.meta.env.VITE_TMDB_API_KEY || '';
+}
+
+const TMDB_API_KEY = getTmdbApiKey();
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/original';
 const DEFAULT_REGION = 'IN'; // Default to India, fallback to US
 const FALLBACK_REGION = 'US';

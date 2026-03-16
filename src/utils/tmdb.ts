@@ -1,7 +1,17 @@
 import axios from 'axios';
 import { MediaType, StreamingProvider, Review } from '../types';
 
-const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+// Check for runtime API key - prioritize localStorage
+function getTmdbApiKey(): string {
+  // Check if user has saved API key in localStorage
+  const localKey = localStorage.getItem('tmdb_api_key');
+  if (localKey) return localKey;
+
+  // Fallback to environment variable (for development only)
+  return import.meta.env.VITE_TMDB_API_KEY || '';
+}
+
+const TMDB_API_KEY = getTmdbApiKey();
 const BASE_URL = 'https://api.themoviedb.org/3';
 
 // Validate TMDB API key on module load

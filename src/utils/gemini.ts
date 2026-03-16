@@ -1,9 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// Check for runtime API key from user input (set via ApiKeyModal or localStorage)
+// Priority: localStorage > fallback to none (no build-time key exposure)
+function getRuntimeApiKey(): string | null {
+  // Check if user has saved API key in localStorage (set by ApiKeyModal)
+  return localStorage.getItem('gemini_api_key');
+}
 
 // Configurable model - defaults to Gemma for better results
-// Set VITE_GEMINI_MODEL in environment to use a different model
 const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemma-3-27b-it'
 
 let genAI: GoogleGenerativeAI | null = null;
@@ -14,8 +18,9 @@ let genAI: GoogleGenerativeAI | null = null;
  * @throws Error if the API key is missing or invalid
  */
 export function validateGeminiApiKey(): boolean {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY.trim() === '') {
-    throw new Error('Gemini API key is missing or invalid. Please set VITE_GEMINI_API_KEY in your environment variables.');
+  const apiKey = getRuntimeApiKey();
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error('Gemini API key is missing or invalid. Please set your API key in settings.');
   }
   return true;
 }
@@ -25,15 +30,17 @@ export function validateGeminiApiKey(): boolean {
  * @returns true if the API key is present and valid
  */
 export function isGeminiApiKeyConfigured(): boolean {
-  return !!(GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '');
+  const apiKey = getRuntimeApiKey();
+  return !!(apiKey && apiKey.trim() !== '');
 }
 
 function getGenAI(): GoogleGenerativeAI {
+  const apiKey = getRuntimeApiKey();
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured. Please add your API key in settings.');
+  }
   if (!genAI) {
-    if (!GEMINI_API_KEY) {
-      throw new Error('VITE_GEMINI_API_KEY is not set in environment variables');
-    }
-    genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    genAI = new GoogleGenerativeAI(apiKey);
   }
   return genAI;
 }
