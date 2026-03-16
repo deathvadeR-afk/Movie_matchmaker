@@ -29,6 +29,53 @@ export interface StreamingProvider {
   type: 'flatrate' | 'rent' | 'buy' | 'free';
 }
 
+export type ProviderType = 'flatrate' | 'rent' | 'buy' | 'free';
+
+// OTT Platform definitions with TMDB provider IDs
+export interface OTTPlatform {
+  id: string;
+  name: string;
+  logo: string;
+  providerId: number; // TMDB provider ID for API lookup
+  color: string; // Brand color for UI
+}
+
+export const OTT_PLATFORMS: OTTPlatform[] = [
+  { id: 'netflix', name: 'Netflix', logo: 'N', providerId: 8, color: '#E50914' },
+  { id: 'prime', name: 'Prime Video', logo: 'PV', providerId: 119, color: '#00A8E1' },
+  { id: 'disney', name: 'Disney+', logo: 'D+', providerId: 337, color: '#113CCF' },
+  { id: 'hotstar', name: 'Hotstar', logo: 'HS', providerId: 1229, color: '#094099' },
+  { id: 'hbo', name: 'HBO Max', logo: 'HBO', providerId: 384, color: '#5822B4' },
+  { id: 'hulu', name: 'Hulu', logo: 'Hulu', providerId: 15, color: '#1CE783' },
+  { id: 'apple', name: 'Apple TV+', logo: 'TV+', providerId: 350, color: '#000000' },
+  { id: 'peacock', name: 'Peacock', logo: 'P', providerId: 387, color: '#000000' },
+  { id: 'paramount', name: 'Paramount+', logo: 'P+', providerId: 531, color: '#0064FF' },
+  { id: 'sonylive', name: 'SonyLIV', logo: 'SL', providerId: 412, color: '#000000' },
+  { id: 'zee', name: 'ZEE5', logo: 'Z5', providerId: 1256, color: '#CB2929' },
+  { id: 'viu', name: 'Viu', logo: 'Viu', providerId: 307, color: '#F40000' },
+];
+
+export function getOTTPlatformById(id: string): OTTPlatform | undefined {
+  return OTT_PLATFORMS.find(p => p.id === id);
+}
+
+export function getOTTPlatformByName(name: string): OTTPlatform | undefined {
+  return OTT_PLATFORMS.find(p => p.name.toLowerCase().includes(name.toLowerCase()));
+}
+
+export interface RegionProviders {
+  region: string;
+  flatrate?: StreamingProvider[];
+  rent?: StreamingProvider[];
+  buy?: StreamingProvider[];
+  free?: StreamingProvider[];
+}
+
+export interface WatchProvidersResponse {
+  providers: RegionProviders;
+  lastUpdated: number;
+}
+
 export interface MediaRecommendation {
   id: number;
   title: string;
@@ -72,14 +119,16 @@ export interface MoodChip {
 }
 
 export const MOOD_CHIPS: MoodChip[] = [
-  { id: 'laugh', label: 'Need a Laugh', prompt: 'funny comedy that will make me laugh out loud', icon: '😂' },
-  { id: 'cry', label: 'Good Cry', prompt: 'emotional drama that will make me cry happy or sad tears', icon: '😢' },
-  { id: 'thrill', label: 'Adrenaline Rush', prompt: 'intense action thriller with exciting sequences', icon: '⚡' },
-  { id: 'think', label: 'Mind Bender', prompt: 'thought-provoking movie with plot twists and deep themes', icon: '🧠' },
-  { id: 'cozy', label: 'Cozy Night', prompt: 'feel-good heartwarming movie perfect for relaxing', icon: '🛋️' },
-  { id: 'scare', label: 'Scare Me', prompt: 'scary horror movie that will terrify me', icon: '👻' },
-  { id: 'romance', label: 'Date Night', prompt: 'romantic movie perfect for couples', icon: '❤️' },
-  { id: 'epic', label: 'Epic Adventure', prompt: 'grand epic adventure with amazing visuals and world-building', icon: '🏔️' },
+  { id: 'laugh', label: 'Need a Laugh', prompt: 'funny hilarious comedy that will make me laugh out loud', icon: '😂' },
+  { id: 'cry', label: 'Good Cry', prompt: 'sad emotional touching drama that will make me cry happy or sad tears', icon: '😢' },
+  { id: 'thrill', label: 'Adrenaline Rush', prompt: 'thrilling intense exciting action thriller with adrenaline rush', icon: '⚡' },
+  { id: 'think', label: 'Mind Bender', prompt: 'thought-provoking complex mind-bending intellectual movie with twist ending', icon: '🧠' },
+  { id: 'cozy', label: 'Cozy Night', prompt: 'cozy comforting feel-good wholesome heartwarming relaxing movie for a chill night', icon: '🛋️' },
+  { id: 'scare', label: 'Scare Me', prompt: 'scary terrifying horror frightening creepy spooky movie that will scare me', icon: '👻' },
+  { id: 'romance', label: 'Date Night', prompt: 'romantic love passionate passionate date night movie perfect for couples', icon: '❤️' },
+  { id: 'epic', label: 'Epic Adventure', prompt: 'epic grand adventure amazing visuals spectacular magical fantasy world-building', icon: '🏔️' },
+  { id: 'dark', label: 'Dark & Gritty', prompt: 'dark gritty serious mature noir thriller crime drama', icon: '🌑' },
+  { id: 'inspiring', label: 'Inspiring', prompt: 'inspiring uplifting motivational triumphant inspirational story of overcoming odds', icon: '💪' },
 ];
 
 export interface RegionConfig {
@@ -262,6 +311,7 @@ export interface CacheTTLConfig {
   details: number;     // 1 hour
   recommendations: number; // 1 hour
   similar: number;      // 30 minutes
+  providers: number;   // 24 hours
 }
 
 // Default TTL configuration (in milliseconds)
@@ -271,6 +321,7 @@ export const DEFAULT_CACHE_TTL: CacheTTLConfig = {
   details: 60 * 60 * 1000,      // 1 hour
   recommendations: 60 * 60 * 1000, // 1 hour
   similar: 30 * 60 * 1000,      // 30 minutes
+  providers: 24 * 60 * 60 * 1000, // 24 hours
 };
 
 // ============================================

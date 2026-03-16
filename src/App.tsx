@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Sparkles, Film, Tv, PlayCircle, ChevronDown, ChevronUp, ExternalLink, Mic, Loader2, LogOut, User, Settings, MicOff, Globe, Languages, Calendar } from 'lucide-react';
+import { Search, Sparkles, Film, Tv, PlayCircle, ChevronDown, ChevronUp, ExternalLink, Mic, Loader2, LogOut, User, Settings, MicOff, Globe, Languages, Calendar, Star, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { MediaRecommendation, MediaType, MOOD_CHIPS, Review, StreamingProvider, VoiceState } from './types';
 import { getRecommendations, RecommendationOptions } from './utils/recommendationEngine';
 import { startListening, stopListening, isVoiceSupported, setOnResult, setOnStateChange } from './utils/voiceSearch';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Badge } from './components/ui/Badge';
+import { StreamingBadge, StreamingBadgeList, StreamingAvailability, StreamingIndicator } from './components/ui/StreamingBadge';
+import { OTTSelector } from './components/ui/OTTSelector';
 import { useAuth } from './contexts/AuthContext';
 
 // Region and Language options for TMDB
@@ -107,15 +110,19 @@ function App() {
   const [latestReleases, setLatestReleases] = useState(false);
   const [region, setRegion] = useState('IN'); // Default to India
   const [language, setLanguage] = useState(''); // Empty means all languages
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]); // OTT platform filter
   const [showRegionDropdown, setShowRegionDropdown] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isRefineListening, setIsRefineListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceTarget, setVoiceTarget] = useState<'main' | 'refine'>('main');
   const [refineInput, setRefineInput] = useState('');
 
   const { user, signOut, profile } = useAuth();
+  const navigate = useNavigate();
 
   // Check voice support on mount
   useEffect(() => {
@@ -124,16 +131,23 @@ function App() {
     // Set up voice result callback
     setOnResult((result) => {
       if (result.transcript) {
-        setInput(result.transcript);
+        if (voiceTarget === 'refine') {
+          setRefineInput(result.transcript);
+        } else {
+          setInput(result.transcript);
+          // Auto-submit after voice input for main search
+          fetchRecommendations(result.transcript);
+        }
         setIsListening(false);
-        // Auto-submit after voice input
-        fetchRecommendations(result.transcript);
+        setIsRefineListening(false);
       }
     });
 
     // Set up voice state callback
     setOnStateChange((state) => {
-      setIsListening(state === 'listening');
+      const isListening = state === 'listening';
+      setIsListening(isListening);
+      setIsRefineListening(isListening);
     });
   }, []);
 
@@ -181,6 +195,7 @@ function App() {
   };
 
   const toggleVoiceSearch = () => {
+    setVoiceTarget('main');
     if (isListening) {
       stopListening();
       setIsListening(false);
@@ -188,6 +203,21 @@ function App() {
       if (voiceSupported) {
         startListening();
         setIsListening(true);
+      } else {
+        alert('Voice recognition is not supported in your browser.');
+      }
+    }
+  };
+
+  const toggleRefineVoiceSearch = () => {
+    setVoiceTarget('refine');
+    if (isRefineListening) {
+      stopListening();
+      setIsRefineListening(false);
+    } else {
+      if (voiceSupported) {
+        startListening();
+        setIsRefineListening(true);
       } else {
         alert('Voice recognition is not supported in your browser.');
       }
@@ -207,7 +237,14 @@ function App() {
       // Use detected values if provided, otherwise fall back to state values
       const langToUse = detectedLanguage || language;
       const regionToUse = detectedRegion || region;
-      const options: RecommendationOptions = { mediaType, hiddenGems, region: regionToUse, language: langToUse || undefined, recentOnly: latestReleases };
+      const options: RecommendationOptions = {
+        mediaType,
+        hiddenGems,
+        region: regionToUse,
+        language: langToUse || undefined,
+        recentOnly: latestReleases,
+        preferredProviders: selectedPlatforms.length > 0 ? selectedPlatforms : undefined
+      };
       const results = await getRecommendations(query, options);
 
       clearTimeout(timeoutId);
@@ -304,6 +341,13 @@ function App() {
                     <Badge variant="premium" className="mt-1">Premium</Badge>
                   )}
                 </div>
+                <button
+                  onClick={() => navigate('/analytics')}
+                  className="w-full px-4 py-3 text-left text-sm text-cream-300 hover:bg-cinema-700/50 flex items-center gap-2 transition-colors"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Analytics
+                </button>
                 <button
                   onClick={() => signOut()}
                   className="w-full px-4 py-3 text-left text-sm text-cream-300 hover:bg-cinema-700/50 flex items-center gap-2 transition-colors"
@@ -487,6 +531,13 @@ function App() {
                 </div>
               )}
             </div>
+
+            {/* OTT Platform Selector */}
+            <OTTSelector
+              selectedPlatforms={selectedPlatforms}
+              onChange={setSelectedPlatforms}
+              disabled={isLoading}
+            />
           </div>
         </div>
       </div>
@@ -519,6 +570,16 @@ function App() {
                     placeholder="Refine recommendations: e.g., make it darker, more romantic..."
                     className="flex-1 px-4 py-3 bg-transparent focus:outline-none text-cream-100 placeholder-cream-500"
                   />
+                  <button
+                    type="button"
+                    onClick={toggleRefineVoiceSearch}
+                    disabled={!voiceSupported}
+                    className={`mr-2 p-2 transition-colors ${isRefineListening ? 'text-red-500 animate-pulse' : 'text-cream-400 hover:text-gold-500'
+                      }`}
+                    title={voiceSupported ? (isRefineListening ? 'Stop Voice Search' : 'Voice Search') : 'Voice Search Not Supported'}
+                  >
+                    {isRefineListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
                   <Button type="submit" variant="primary" size="md">
                     Refine
                   </Button>
@@ -544,6 +605,19 @@ function App() {
                     ) : (
                       <div className="w-full h-80 md:h-full bg-cinema-700 flex items-center justify-center">
                         <Film className="w-16 h-16 text-cinema-500" />
+                      </div>
+                    )}
+                    {/* Streaming indicator */}
+                    <div className="absolute top-2 left-2">
+                      <StreamingIndicator
+                        hasStreaming={item.streamingProviders && item.streamingProviders.length > 0}
+                      />
+                    </div>
+                    {/* Rating badge */}
+                    {item.rating > 0 && (
+                      <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-cinema-950/80 backdrop-blur-sm rounded-lg">
+                        <Star className="w-3.5 h-3.5 text-gold-500 fill-gold-500" />
+                        <span className="text-sm font-medium text-cream-100">{item.rating.toFixed(1)}</span>
                       </div>
                     )}
                     {/* Gradient overlay */}
@@ -619,34 +693,39 @@ function App() {
                     <p className="text-cream-300 mb-5 line-clamp-3 leading-relaxed">{item.plot}</p>
 
                     {/* Streaming Providers */}
-                    {item.streamingProviders && item.streamingProviders.length > 0 && (
+                    {item.streamingProviders && item.streamingProviders.length > 0 ? (
                       <div className="mb-4">
                         <h4 className="text-sm font-medium text-cream-400 mb-3">Where to Watch</h4>
+                        <StreamingAvailability
+                          providers={item.streamingProviders}
+                          region={region}
+                          className="mb-3"
+                        />
+                        {/* Clickable provider links */}
                         <div className="flex flex-wrap gap-2">
-                          {item.streamingProviders.slice(0, 6).map((provider, idx) => (
+                          {item.streamingProviders.slice(0, 4).map((provider, idx) => (
                             <a
                               key={idx}
                               href={getStreamingUrl(provider.name, item.title)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 px-3 py-2 bg-cinema-700/50 hover:bg-cinema-600/70 rounded-lg transition-all duration-300 cursor-pointer group border border-transparent hover:border-gold-600/30"
+                              className="flex items-center gap-2 px-3 py-1.5 bg-cinema-700/50 hover:bg-cinema-600/70 rounded-lg transition-all duration-300 cursor-pointer group border border-transparent hover:border-gold-600/30"
                               title={`Watch on ${provider.name}`}
                             >
                               {provider.logo ? (
-                                <img src={provider.logo} alt={provider.name} className="w-5 h-5 rounded object-contain bg-white/10" />
+                                <img src={provider.logo} alt={provider.name} className="w-4 h-4 rounded object-contain bg-white/10" />
                               ) : (
-                                <PlayCircle className="w-5 h-5 text-gold-500" />
+                                <PlayCircle className="w-4 h-4 text-gold-500" />
                               )}
-                              <span className="text-sm text-cream-200 group-hover:text-gold-400 transition-colors">{provider.name}</span>
-                              <span className={`text-xs px-2 py-0.5 rounded ${provider.type === 'free' ? 'bg-green-500/20 text-green-400' :
-                                provider.type === 'flatrate' ? 'bg-blue-500/20 text-blue-400' :
-                                  'bg-cinema-600/50 text-cream-400'
-                                }`}>
-                                {getProviderTypeLabel(provider.type)}
-                              </span>
+                              <span className="text-xs text-cream-200 group-hover:text-gold-400 transition-colors">{provider.name}</span>
                             </a>
                           ))}
                         </div>
+                      </div>
+                    ) : (
+                      <div className="mb-4 flex items-center gap-2 text-cream-500">
+                        <span>📡</span>
+                        <span className="text-sm">Not available to stream</span>
                       </div>
                     )}
 

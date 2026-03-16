@@ -139,10 +139,18 @@ export async function updateProfile(updates: Partial<UserProfile>): Promise<{ su
  * Update last login timestamp
  */
 async function updateLastLogin(userId: string): Promise<void> {
-    await supabase
-        .from('user_profiles')
-        .update({ last_login_at: new Date().toISOString() })
-        .eq('id', userId);
+    try {
+        const { error } = await supabase
+            .from('user_profiles')
+            .update({ last_login_at: new Date().toISOString() })
+            .eq('id', userId);
+
+        if (error) {
+            console.error('Failed to update last login timestamp:', error.message);
+        }
+    } catch (err) {
+        console.error('Error updating last login timestamp:', err);
+    }
 }
 
 /**

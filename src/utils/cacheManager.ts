@@ -124,7 +124,7 @@ function simpleHash(str: string): string {
 
 // Generate smart cache key based on request parameters
 export function generateCacheKey(
-    type: 'trending' | 'search' | 'details' | 'recommendations' | 'similar',
+    type: 'trending' | 'search' | 'details' | 'recommendations' | 'similar' | 'providers',
     params: Record<string, unknown>
 ): string {
     const base = `cache:${type}`;
@@ -197,7 +197,7 @@ export async function getCached<T = unknown>(key: string): Promise<T | null> {
             hitCount++;
             stats.avgHitTime = totalHitTime / hitCount;
             updateHitRate();
-            console.log(`[Cache] Redis HIT: ${key}`);
+            console.log(`[Cache] Redis HIT: movie_cache:${key}`);
             return redisData;
         }
         stats.misses++;
@@ -262,9 +262,11 @@ export async function setCache<T = unknown>(
 
     // Write to Redis if available (async, don't await for performance)
     if (redisAvailable) {
-        setRedisData(key, data, ttl).then((success) => {
+        setRedisData(key, data, effectiveTTL).then((success) => {
             if (success) {
-                console.log(`[Cache] Redis SET: ${key} (TTL: ${effectiveTTL}ms)`);
+                console.log(`[Cache] Redis SET: movie_cache:${key} (TTL: ${effectiveTTL}ms)`);
+            } else {
+                console.warn(`[Cache] Redis SET failed: movie_cache:${key}`);
             }
         }).catch(err => console.warn('[Cache] Redis set error:', err));
     }

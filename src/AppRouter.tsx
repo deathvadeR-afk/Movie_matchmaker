@@ -7,6 +7,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import App from './App';
 import AdminPage from './pages/AdminPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import { useAuth } from './contexts/AuthContext';
@@ -92,6 +93,14 @@ function AppRouterContent() {
                 element={
                     <ProtectedRoute>
                         <AdminPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/analytics"
+                element={
+                    <ProtectedRoute>
+                        <AnalyticsPage />
                     </ProtectedRoute>
                 }
             />

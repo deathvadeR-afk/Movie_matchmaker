@@ -47,6 +47,116 @@ const emotionKeywords: Record<string, string[]> = {
     wonder: ['amazing', 'wonderful', 'magical', 'spectacular', 'mindblowing'],
 };
 
+// Mood to Genre mapping for mood-based recommendations
+const MOOD_TO_GENRE_MAP: Record<string, string[]> = {
+    // Feel-good moods
+    happy: ['comedy', 'animation', 'family', 'romance'],
+    joyful: ['comedy', 'animation', 'family'],
+    fun: ['comedy', 'action', 'animation'],
+    upbeat: ['comedy', 'music', 'romance'],
+    cheerful: ['comedy', 'family', 'animation'],
+
+    // Uplifting moods
+    inspiring: ['drama', 'biography', 'documentary'],
+    uplifting: ['comedy', 'drama', 'romance'],
+    motivating: ['drama', 'sport', 'biography'],
+
+    // Emotional moods
+    sad: ['drama', 'romance', 'war'],
+    emotional: ['drama', 'romance', 'thriller'],
+    touching: ['drama', 'romance', 'family'],
+    tearjerker: ['drama', 'romance'],
+    bittersweet: ['drama', 'romance'],
+
+    // Thriller/Action moods
+    thrilling: ['thriller', 'action', 'horror'],
+    suspenseful: ['thriller', 'mystery', 'crime'],
+    action: ['action', 'adventure', 'thriller'],
+    exciting: ['action', 'adventure', 'sci-fi'],
+    intense: ['action', 'thriller', 'crime'],
+    adrenaline: ['action', 'sport', 'thriller'],
+
+    // Romance moods
+    romantic: ['romance', 'drama', 'comedy'],
+    love: ['romance', 'drama', 'comedy'],
+    passionate: ['romance', 'drama', 'action'],
+
+    // Scary moods
+    scary: ['horror', 'thriller', 'mystery'],
+    frightening: ['horror', 'thriller'],
+    terrifying: ['horror'],
+    creepy: ['horror', 'thriller', 'mystery'],
+    horror: ['horror', 'thriller'],
+    spooky: ['horror', 'fantasy'],
+
+    // Dark moods
+    dark: ['thriller', 'crime', 'drama'],
+    noir: ['thriller', 'crime', 'mystery'],
+    gritty: ['crime', 'drama', 'action'],
+    serious: ['drama', 'thriller', 'crime'],
+    mature: ['drama', 'thriller', 'crime'],
+
+    // Comedy moods
+    funny: ['comedy'],
+    hilarious: ['comedy'],
+    witty: ['comedy', 'romance'],
+    absurd: ['comedy'],
+
+    // Cozy/Relaxing moods
+    cozy: ['comedy', 'family', 'romance'],
+    comforting: ['comedy', 'family', 'drama'],
+    feelgood: ['comedy', 'family', 'romance'],
+    wholesome: ['family', 'animation', 'comedy'],
+    heartwarming: ['drama', 'family', 'romance'],
+    relaxing: ['documentary', 'drama', 'comedy'],
+    calming: ['drama', 'documentary', 'family'],
+    peaceful: ['drama', 'documentary', 'family'],
+    gentle: ['drama', 'family', 'romance'],
+
+    // Intellectual moods
+    thoughtprovoking: ['drama', 'sci-fi', 'mystery'],
+    mindbending: ['sci-fi', 'thriller', 'mystery'],
+    complex: ['drama', 'thriller', 'mystery'],
+    intellectual: ['drama', 'documentary', 'mystery'],
+    philosophical: ['drama', 'sci-fi'],
+    cerebral: ['sci-fi', 'thriller', 'mystery'],
+    twist: ['thriller', 'mystery', 'drama'],
+
+    // Relaxing/ Easy watching
+    chill: ['comedy', 'drama', 'romance'],
+    slowpaced: ['drama', 'documentary'],
+    meditative: ['documentary', 'drama'],
+};
+
+// Normalize mood key for lookup
+function normalizeMoodKey(mood: string): string {
+    return mood.toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
+}
+
+// Convert detected moods to genres
+function moodsToGenres(moods: string[]): string[] {
+    const genreSet = new Set<string>();
+
+    for (const mood of moods) {
+        const normalizedMood = normalizeMoodKey(mood);
+
+        // Direct lookup in the map
+        if (MOOD_TO_GENRE_MAP[normalizedMood]) {
+            MOOD_TO_GENRE_MAP[normalizedMood].forEach(g => genreSet.add(g));
+            continue;
+        }
+
+        // Partial match - check if any key is contained in the mood
+        for (const [key, genres] of Object.entries(MOOD_TO_GENRE_MAP)) {
+            if (normalizedMood.includes(key) || key.includes(normalizedMood)) {
+                genres.forEach(g => genreSet.add(g));
+            }
+        }
+    }
+
+    return Array.from(genreSet);
+}
+
 // Language detection keywords
 const languageKeywords: Record<string, string> = {
     hindi: 'hi',
@@ -145,6 +255,7 @@ export interface RecommendationOptions {
     language?: string; // Language code (e.g., 'hi' for Hindi)
     page?: number; // Page number for pagination (default: 1)
     recentOnly?: boolean; // Filter for recent releases (past year)
+    preferredProviders?: string[]; // Filter by streaming providers (OTT platforms)
 }
 
 /**
@@ -154,7 +265,7 @@ export async function getRecommendations(
     userInput: string,
     options: RecommendationOptions = { mediaType: 'movie', hiddenGems: false, region: 'IN' }
 ): Promise<{ recommendations: MediaRecommendation[]; pagination: PaginationInfo }> {
-    const { mediaType, hiddenGems, region, page = 1, recentOnly = false } = options;
+    const { mediaType, hiddenGems, region, page = 1, recentOnly = false, preferredProviders } = options;
 
     // Get the current year for recent filtering
     const currentYear = new Date().getFullYear();
@@ -209,7 +320,23 @@ export async function getRecommendations(
 
     return {
         recommendations: recommendations
-            .filter((r) => r.matchPercentage > 30)
+            .filter((r) => {
+                // Filter by match percentage
+                if (r.matchPercentage <= 30) return false;
+
+                // Filter by preferred providers if specified (OR logic - available on ANY selected platform)
+                if (preferredProviders && preferredProviders.length > 0) {
+                    const availablePlatforms = r.streamingPlatforms.map(p => p.toLowerCase());
+                    const hasProvider = preferredProviders.some(provider =>
+                        availablePlatforms.some(platform =>
+                            platform.includes(provider.toLowerCase())
+                        )
+                    );
+                    if (!hasProvider) return false;
+                }
+
+                return true;
+            })
             .sort((a, b) => b.matchPercentage - a.matchPercentage)
             .slice(0, 7),
         pagination: { totalPages: 1, currentPage: page, totalResults: recommendations.length }
@@ -256,9 +383,21 @@ async function getHeuristicRecommendations(
     const recentYear = recentOnly ? currentYear : undefined;
 
     // Use NLP-enhanced parameters if available
-    const genres = nlpAnalysis?.genres || analysis.genres;
+    let genres = nlpAnalysis?.genres || analysis.genres;
     const language = nlpAnalysis?.language || analysis.language;
     const temporal = nlpAnalysis?.temporal;
+
+    // If no genres found, try converting moods/emotions to genres
+    if (genres.length === 0) {
+        const emotions = nlpAnalysis?.emotions || analysis.emotions;
+        if (emotions.length > 0) {
+            const moodGenres = moodsToGenres(emotions);
+            if (moodGenres.length > 0) {
+                genres = moodGenres;
+                console.log(`[Mood-Based] Converted moods ${emotions.join(', ')} to genres: ${genres.join(', ')}`);
+            }
+        }
+    }
 
     const searchOptions: SearchOptions = {
         mediaType,
@@ -293,13 +432,73 @@ async function getHeuristicRecommendations(
 }
 
 /**
+ * Calculate dynamic match score based on multiple factors
+ */
+function calculateMatchScore(
+    media: TMDBMedia,
+    nlpGenres: string[],
+    userGenreScores: Record<string, number> = {}
+): number {
+    // TMDB genre IDs to names mapping
+    const genreIdMap: Record<number, string> = {
+        28: 'action', 12: 'adventure', 16: 'animation', 35: 'comedy', 80: 'crime',
+        99: 'documentary', 18: 'drama', 10751: 'family', 14: 'fantasy', 36: 'history',
+        27: 'horror', 10402: 'music', 9648: 'mystery', 10749: 'romance', 878: 'science fiction',
+        10770: 'tv movie', 53: 'thriller', 10752: 'war', 37: 'western',
+        10759: 'action & adventure', 10762: 'kids', 10763: 'news', 10764: 'reality',
+        10765: 'sci-fi & fantasy', 10766: 'soap', 10767: 'talk', 10768: 'war & politics'
+    };
+
+    // Convert genre IDs to names
+    const mediaGenreNames = (media.genre_ids || []).map((id: number) => genreIdMap[id] || '').filter(Boolean);
+
+    let score = 40; // Base score
+
+    // 1. Genre matching (up to +30 points)
+    if (nlpGenres.length > 0 && mediaGenreNames.length > 0) {
+        const genreMatches = nlpGenres.filter((g: string) =>
+            mediaGenreNames.some((mg: string) =>
+                mg.toLowerCase().includes(g.toLowerCase()) ||
+                g.toLowerCase().includes(mg.toLowerCase())
+            )
+        );
+        const genreScore = Math.min(30, (genreMatches.length / nlpGenres.length) * 30);
+        score += genreScore;
+    } else if (Object.keys(userGenreScores).length > 0 && mediaGenreNames.length > 0) {
+        // Fallback to user preferences
+        const genreScore = mediaGenreNames.reduce((acc: number, g: string) =>
+            acc + (userGenreScores[g.toLowerCase()] || 0), 0
+        );
+        score += Math.min(30, genreScore);
+    }
+
+    // 2. Rating bonus (up to +15 points)
+    score += Math.min(15, (media.vote_average || 0) * 1.5);
+
+    // 3. Popularity bonus (up to +10 points)
+    score += Math.min(10, (media.popularity || 0) / 500);
+
+    // 4. Recency bonus (up to +5 points)
+    const releaseYear = new Date(media.release_date || media.first_air_date || '').getFullYear();
+    const currentYear = new Date().getFullYear();
+    const yearsOld = currentYear - releaseYear;
+    if (yearsOld <= 1) score += 5;
+    else if (yearsOld <= 3) score += 3;
+    else if (yearsOld <= 5) score += 1;
+
+    return Math.min(100, Math.max(0, Math.round(score)));
+}
+
+/**
  * Build a full MediaRecommendation from TMDB data
  */
 async function buildRecommendation(
     media: TMDBMedia,
     mediaType: MediaType,
     region: string,
-    aiExplanation?: string
+    aiExplanation?: string,
+    nlpGenres?: string[],
+    userGenreScores?: Record<string, number>
 ): Promise<MediaRecommendation | null> {
     const tmdbType = mediaType === 'anime' ? 'tv' : mediaType;
     const title = media.title || media.name || 'Unknown';
@@ -313,6 +512,9 @@ async function buildRecommendation(
             getMediaVideos(media.id, tmdbType),
             tmdbType === 'tv' ? getTVDetails(media.id) : Promise.resolve(null),
         ]);
+
+        // Calculate dynamic match score
+        const matchScore = calculateMatchScore(media, nlpGenres || [], userGenreScores);
 
         return {
             id: media.id,
@@ -331,7 +533,7 @@ async function buildRecommendation(
             intensity: 5,
             emotions: [],
             themes: [],
-            matchPercentage: aiExplanation ? 85 : 70, // AI matches get higher base score
+            matchPercentage: matchScore, // Dynamic calculation
             mediaType,
             aiExplanation,
             numberOfSeasons: tvDetails?.seasons,
